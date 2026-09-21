@@ -182,3 +182,169 @@
     border-right-color: var(--border);
   }
 }
+
+.evaluator-dashboard {
+    padding: 10px;
+}
+
+.evaluator-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.evaluator-header h1 {
+    margin: 0;
+    font-size: 28px;
+}
+
+.evaluator-header p {
+    color: #6b7280;
+    margin-top: 7px;
+}
+
+.evaluator-stat {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: white;
+    border: 1px solid #e5e7eb;
+    padding: 12px 18px;
+    border-radius: 12px;
+}
+
+.evaluator-stat div {
+    display: flex;
+    flex-direction: column;
+}
+
+.evaluator-stat strong {
+    font-size: 20px;
+}
+
+.evaluator-stat span {
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.proposal-grid {
+    display: grid;
+    grid-template-columns:
+        repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.evaluator-proposal-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 15px;
+    padding: 22px;
+}
+
+.proposal-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.proposal-icon {
+    width: 42px;
+    height: 42px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #f3f4f6;
+    border-radius: 10px;
+}
+
+.pending-tag {
+    font-size: 12px;
+    padding: 5px 10px;
+    border-radius: 20px;
+    background: #fef3c7;
+}
+
+.evaluator-proposal-card h2 {
+    margin-top: 20px;
+    font-size: 19px;
+}
+
+.evaluator-proposal-card > p {
+    color: #6b7280;
+    line-height: 1.5;
+}
+
+.technical-preview {
+    background: #f9fafb;
+    padding: 12px;
+    border-radius: 9px;
+    margin-top: 15px;
+}
+
+.technical-preview strong {
+    font-size: 13px;
+}
+
+.technical-preview p {
+    color: #6b7280;
+    font-size: 13px;
+}
+
+.evaluate-btn {
+    width: 100%;
+    margin-top: 18px;
+    border: none;
+    border-radius: 9px;
+    padding: 11px;
+    background: #111827;
+    color: white;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+}
+
+.evaluation-modal {
+    background: white;
+    width: 100%;
+    max-width: 700px;
+    max-height: 90vh;
+    overflow-y: auto;
+    border-radius: 16px;
+    padding: 25px;
+}
+
+.proposal-details {
+    background: #f9fafb;
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+}
+
+.proposal-details h3 {
+    font-size: 14px;
+    margin-bottom: 5px;
+}
+
+.proposal-details p {
+    color: #6b7280;
+    line-height: 1.5;
+    font-size: 14px;
+}
+
+.score-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+}
+
+.form-group select {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 11px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: white;
+}
