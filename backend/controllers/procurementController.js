@@ -73,6 +73,20 @@ const createProcurement = async (req, res) => {
         }
 
         const procurement_officer_id = req.user.id;
+        const existingProcurement = await pool.query(
+    `SELECT id
+     FROM procurements
+     WHERE proposal_id = $1`,
+    [proposal_id]
+);
+
+if (existingProcurement.rows.length > 0) {
+    return res.status(400).json({
+        success: false,
+        message: "Procurement already exists for this proposal"
+    });
+}
+        
 
         // Check proposal and find startup's USER id
         const proposalResult = await pool.query(
@@ -117,7 +131,12 @@ const createProcurement = async (req, res) => {
 
         const procurement = result.rows[0];
 
+        console.log("PROCUREMENT CREATED:", procurement);
+        console.log("STARTUP USER ID:", startupUserId);
+
         // Notify startup
+        console.log("INSERTING STARTUP NOTIFICATION...");
+
         await pool.query(
             `INSERT INTO notifications
             (
@@ -135,6 +154,8 @@ const createProcurement = async (req, res) => {
             ]
         );
 
+        console.log("STARTUP NOTIFICATION INSERTED");
+
         // Find all government users
         const governments = await pool.query(
             `SELECT id
@@ -142,8 +163,16 @@ const createProcurement = async (req, res) => {
              WHERE role = 'GOVERNMENT'`
         );
 
+        console.log("GOVERNMENT USERS:", governments.rows);
+
         // Notify government users
         for (const government of governments.rows) {
+
+            console.log(
+                "INSERTING GOVERNMENT NOTIFICATION FOR:",
+                government.id
+            );
+
             await pool.query(
                 `INSERT INTO notifications
                 (
@@ -159,6 +188,11 @@ const createProcurement = async (req, res) => {
                     `Procurement has been created for proposal #${proposal_id}. Contract value: ${procurement.contract_value || "Not specified"}.`,
                     "PROCUREMENT"
                 ]
+            );
+
+            console.log(
+                "GOVERNMENT NOTIFICATION INSERTED FOR:",
+                government.id
             );
         }
 
