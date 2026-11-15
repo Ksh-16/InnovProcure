@@ -74,6 +74,8 @@ const getChallengeById = async (req, res) => {
 };
 
 // Create challenge
+
+
 const createChallenge = async (req, res) => {
     try {
         const {
@@ -91,12 +93,26 @@ const createChallenge = async (req, res) => {
             });
         }
 
-        // Create the challenge
+        // Verify that this department belongs to the logged-in government user.
+        const department = await pool.query(
+            `SELECT id
+             FROM government_departments
+             WHERE id = $1 AND user_id = $2`,
+            [department_id, req.user.id]
+        );
+
+        if (department.rows.length === 0) {
+            return res.status(403).json({
+                success: false,
+                message: "You can only create challenges for your own department"
+            });
+        }
+
         const result = await pool.query(
             `INSERT INTO challenges
-            (department_id, title, description, requirements, category)
-            VALUES ($1, $2, $3, $4, $5)
-            RETURNING *`,
+             (department_id, title, description, requirements, category)
+             VALUES ($1, $2, $3, $4, $5)
+             RETURNING *`,
             [
                 department_id,
                 title,
@@ -108,51 +124,37 @@ const createChallenge = async (req, res) => {
 
         const challenge = result.rows[0];
 
-        // Find all startup users
-        const startups = await pool.query(
-            `SELECT id
+        // Notify all startup users about the new challenge.
+        await pool.query(
+            `INSERT INTO notifications (user_id, title, message, type)
+             SELECT id, $1, $2, $3
              FROM users
-             WHERE role = 'STARTUP'`
+             WHERE role = 'STARTUP'`,
+            [
+                "New Challenge Available",
+                `A new government challenge "${challenge.title}" has been published. Check it out and submit your proposal.`,
+                "CHALLENGE"
+            ]
         );
 
-        // Create a notification for every startup
-        for (const startup of startups.rows) {
-
-            await pool.query(
-                `INSERT INTO notifications
-                (
-                    user_id,
-                    title,
-                    message,
-                    type
-                )
-                VALUES ($1, $2, $3, $4)`,
-                [
-                    startup.id,
-                    "New Challenge Available",
-                    `A new government challenge "${challenge.title}" has been published. Check it out and submit your proposal.`,
-                    "CHALLENGE"
-                ]
-            );
-
-        }
-
-        res.status(201).json({
+        return res.status(201).json({
             success: true,
             message: "Challenge created successfully",
-            challenge: challenge
+            challenge
         });
 
     } catch (error) {
         console.error("Error creating challenge:", error);
 
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: "Failed to create challenge"
         });
     }
 };
+
 // Update challenge
+
 const updateChallenge = async (req, res) => {
     try {
         const { id } = req.params;
@@ -165,42 +167,69 @@ const updateChallenge = async (req, res) => {
             category
         } = req.body;
 
+        // Find the department owned by the logged-in government user.
+        const department = await pool.query(
+            `SELECT id
+             FROM government_departments
+             WHERE user_id = $1`,
+            [req.user.id]
+        );
+
+        if (department.rows.length === 0) {
+            return res.status(403).json({
+                success: false,
+                message: "Government department not found"
+            });
+        }
+
+        const ownDepartmentId = department.rows[0].id;
+
+        // Prevent changing the challenge to another department.
+        if (
+            department_id &&
+            Number(department_id) !== Number(ownDepartmentId)
+        ) {
+            return res.status(403).json({
+                success: false,
+                message: "You cannot modify another department's challenge"
+            });
+        }
+
         const result = await pool.query(
             `UPDATE challenges
-             SET department_id = $1,
-                 title = $2,
-                 description = $3,
-                 requirements = $4,
-                 category = $5
-             WHERE id = $6
+             SET title = $1,
+                 description = $2,
+                 requirements = $3,
+                 category = $4
+             WHERE id = $5 AND department_id = $6
              RETURNING *`,
             [
-                department_id,
                 title,
                 description,
-                requirements,
-                category,
-                id
+                requirements || null,
+                category || null,
+                id,
+                ownDepartmentId
             ]
         );
 
         if (result.rows.length === 0) {
             return res.status(404).json({
                 success: false,
-                message: "Challenge not found"
+                message: "Challenge not found in your department"
             });
         }
 
-        res.status(200).json({
+        return res.status(200).json({
             success: true,
             message: "Challenge updated successfully",
             challenge: result.rows[0]
         });
 
     } catch (error) {
-        console.error(error);
+        console.error("Error updating challenge:", error);
 
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: "Failed to update challenge"
         });
@@ -208,37 +237,47 @@ const updateChallenge = async (req, res) => {
 };
 
 
+
 // Delete challenge
+
 const deleteChallenge = async (req, res) => {
     try {
         const { id } = req.params;
 
         const result = await pool.query(
-            "DELETE FROM challenges WHERE id = $1 RETURNING *",
-            [id]
+            `DELETE FROM challenges
+             WHERE id = $1
+             AND department_id IN (
+                 SELECT id
+                 FROM government_departments
+                 WHERE user_id = $2
+             )
+             RETURNING *`,
+            [id, req.user.id]
         );
 
         if (result.rows.length === 0) {
             return res.status(404).json({
                 success: false,
-                message: "Challenge not found"
+                message: "Challenge not found in your department"
             });
         }
 
-        res.status(200).json({
+        return res.status(200).json({
             success: true,
             message: "Challenge deleted successfully"
         });
 
     } catch (error) {
-        console.error(error);
+        console.error("Error deleting challenge:", error);
 
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: "Failed to delete challenge"
         });
     }
 };
+
 
 
 module.exports = {
