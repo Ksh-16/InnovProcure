@@ -4,18 +4,36 @@ const pool = require("../config/db");
 
 const register = async (req, res) => {
     try {
-        const { name, email, password, role } = req.body;
+        const { name, email, password } = req.body;
 
-        if (!name || !email || !password || !role) {
+        if (!name || !email || !password) {
             return res.status(400).json({
                 success: false,
-                message: "All fields are required"
+                message: "Name, email and password are required"
             });
         }
 
+        if (typeof name !== "string" ||
+            typeof email !== "string" ||
+            typeof password !== "string") {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid input"
+            });
+        }
+
+        if (password.length < 8) {
+            return res.status(400).json({
+                success: false,
+                message: "Password must be at least 8 characters long"
+            });
+        }
+
+        const normalizedEmail = email.trim().toLowerCase();
+
         const existingUser = await pool.query(
             "SELECT id FROM users WHERE email = $1",
-            [email]
+            [normalizedEmail]
         );
 
         if (existingUser.rows.length > 0) {
@@ -27,23 +45,24 @@ const register = async (req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
+        // Public registration is restricted to STARTUP accounts.
         const result = await pool.query(
             `INSERT INTO users (name, email, password, role)
              VALUES ($1, $2, $3, $4)
              RETURNING id, name, email, role, created_at`,
-            [name, email, hashedPassword, role]
+            [name.trim(), normalizedEmail, hashedPassword, "STARTUP"]
         );
 
-        res.status(201).json({
+        return res.status(201).json({
             success: true,
-            message: "User registered successfully",
+            message: "Startup account registered successfully",
             user: result.rows[0]
         });
 
     } catch (error) {
         console.error("Registration error:", error);
 
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: "Server error during registration"
         });

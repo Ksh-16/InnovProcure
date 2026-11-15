@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, Lock, Mail, User } from "lucide-react";
@@ -9,8 +10,7 @@ function Register() {
     const [form, setForm] = useState({
         name: "",
         email: "",
-        password: "",
-        role: "STARTUP"
+        password: ""
     });
 
     const [error, setError] = useState("");
@@ -86,10 +86,10 @@ function Register() {
                     <div className="form-heading">
                         <p>GET STARTED</p>
 
-                        <h2>Create your account</h2>
+                        <h2>Create your startup account</h2>
 
                         <span>
-                            Choose your role and join InnovProcure.
+                            Register your startup and join InnovProcure.
                         </span>
                     </div>
 
@@ -147,32 +147,6 @@ function Register() {
                                     onChange={handleChange}
                                 />
                             </div>
-                        </div>
-
-                        <div className="input-group">
-                            <label>Account type</label>
-
-                            <select
-                                name="role"
-                                value={form.role}
-                                onChange={handleChange}
-                            >
-                                <option value="STARTUP">
-                                    Startup
-                                </option>
-
-                                <option value="GOVERNMENT">
-                                    Government Department
-                                </option>
-
-                                <option value="EVALUATOR">
-                                    Evaluator
-                                </option>
-
-                                <option value="PROCUREMENT_OFFICER">
-                                    Procurement Officer
-                                </option>
-                            </select>
                         </div>
 
                         <button
