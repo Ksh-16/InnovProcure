@@ -21,6 +21,7 @@ function StartupDashboard() {
     const [evaluations, setEvaluations] = useState([]);
     const [procurements, setProcurements] = useState([]);
     const [pilotValidations, setPilotValidations] = useState([]);
+    const [challengeKpiCounts, setChallengeKpiCounts] = useState({});
     const [search, setSearch] = useState("");
     const [category, setCategory] = useState("ALL");
 
@@ -85,9 +86,42 @@ function StartupDashboard() {
         ]);
 
 
-        setProposals(
-            proposalResponse.data.proposals || []
-        );
+       const proposalList = proposalResponse.data.proposals || [];
+
+setProposals(proposalList);
+
+// Fetch KPI counts for the challenges associated with proposals
+const challengeIds = [
+    ...new Set(
+        proposalList.map((item) => Number(item.challenge_id))
+    )
+];
+
+const kpiCountEntries = await Promise.all(
+    challengeIds.map(async (challengeId) => {
+        try {
+            const response = await API.get(
+                `/kpis/challenge/${challengeId}`
+            );
+
+            return [
+                challengeId,
+                (response.data.kpis || []).length
+            ];
+        } catch (error) {
+            console.error(
+                `Error fetching KPIs for challenge ${challengeId}:`,
+                error
+            );
+
+            return [challengeId, 0];
+        }
+    })
+);
+
+setChallengeKpiCounts(
+    Object.fromEntries(kpiCountEntries)
+);
 
 
         setEvaluations(
@@ -614,12 +648,13 @@ function StartupDashboard() {
             {proposals.map((item) => {
 
                 const status =
-                    getProposalStatus(
-                        item.id,
-                        evaluations,
-                         pilotValidations,
-                        procurements
-                    );
+    getProposalStatus(
+        item.id,
+        evaluations,
+        pilotValidations,
+        procurements,
+        challengeKpiCounts[item.challenge_id] || 0
+    );
 
 
                 const statusClass =

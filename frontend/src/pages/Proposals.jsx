@@ -13,6 +13,7 @@ function Proposals() {
     const [loading, setLoading] = useState(true);
     const [selectedProposal, setSelectedProposal] = useState(null);
     const [pilotValidations, setPilotValidations] = useState([]);
+    const [challengeKpiCounts, setChallengeKpiCounts] = useState({});
     const fetchData = async () => {
     try {
         const [
@@ -27,7 +28,41 @@ function Proposals() {
             API.get("/pilot-validations")
         ]);
 
-        setProposals(proposalResponse.data.proposals || []);
+        const proposalList = proposalResponse.data.proposals || [];
+
+setProposals(proposalList);
+
+const challengeIds = [
+    ...new Set(
+        proposalList.map((item) => Number(item.challenge_id))
+    )
+];
+
+const kpiCountEntries = await Promise.all(
+    challengeIds.map(async (challengeId) => {
+        try {
+            const response = await API.get(
+                `/kpis/challenge/${challengeId}`
+            );
+
+            return [
+                challengeId,
+                (response.data.kpis || []).length
+            ];
+        } catch (error) {
+            console.error(
+                `Error fetching KPIs for challenge ${challengeId}:`,
+                error
+            );
+
+            return [challengeId, 0];
+        }
+    })
+);
+
+setChallengeKpiCounts(
+    Object.fromEntries(kpiCountEntries)
+);
         setEvaluations(evaluationResponse.data.evaluations || []);
         setProcurements(procurementResponse.data.procurements || []);
         setPilotValidations(pilotResponse.data.validations || []);
@@ -88,7 +123,8 @@ function Proposals() {
     proposal.id,
     evaluations,
     pilotValidations,
-    procurements
+    procurements,
+    challengeKpiCounts[proposal.challenge_id] || 0
 );
 
 const statusClass =
@@ -287,12 +323,13 @@ const statusClass =
                                 <span>Status</span>
 
                                 <strong>
-    {getProposalStatus(
-        selectedProposal.id,
-        evaluations,
-        pilotValidations,
-        procurements
-    )}
+   {getProposalStatus(
+    selectedProposal.id,
+    evaluations,
+    pilotValidations,
+    procurements,
+    challengeKpiCounts[selectedProposal.challenge_id] || 0
+)}
 </strong>
                             </div>
 
