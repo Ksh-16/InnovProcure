@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 
 const authenticate = require("../middleware/authMiddleware");
-
+const authorize = require("../middleware/roleMiddleware");
 const {
     getNotifications,
     getUnreadNotifications,
@@ -32,6 +32,7 @@ router.get(
 router.post(
     "/",
     authenticate,
+    authorize("ADMIN"),
     createNotification
 );
 

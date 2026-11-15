@@ -150,32 +150,27 @@ const getProposalById = async (req, res) => {
 
         // STARTUP USERS CAN ONLY VIEW THEIR OWN PROPOSALS
 
-        if (
-            req.user.role === "STARTUP" &&
-            Number(proposal.user_id) !== Number(req.user.id)
-        ) {
+if (req.user.role === "STARTUP") {
 
-            // Check ownership directly from startups table
-            const ownership = await pool.query(
-                `
-                SELECT id
-                FROM startups
-                WHERE id = $1
-                AND user_id = $2
-                `,
-                [proposal.startup_id, req.user.id]
-            );
+    const ownership = await pool.query(
+        `
+        SELECT id
+        FROM startups
+        WHERE id = $1
+        AND user_id = $2
+        `,
+        [proposal.startup_id, req.user.id]
+    );
 
-            if (ownership.rows.length === 0) {
+    if (ownership.rows.length === 0) {
 
-                return res.status(403).json({
-                    message:
-                        "You are not authorized to view this proposal."
-                });
+        return res.status(403).json({
+            message:
+                "You are not authorized to view this proposal."
+        });
 
-            }
-
-        }
+    }
+}
 
         res.json({
             proposal

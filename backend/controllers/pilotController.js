@@ -172,16 +172,19 @@ const createPilotValidation = async (req, res) => {
         // -----------------------------------------
 
         const proposalResult = await pool.query(
-            `
-            SELECT
-                id,
-                challenge_id,
-                startup_id
-            FROM proposals
-            WHERE id = $1
-            `,
-            [proposal_id]
-        );
+    `
+    SELECT
+        p.id,
+        p.challenge_id,
+        p.startup_id,
+        s.user_id AS startup_user_id
+    FROM proposals p
+    JOIN startups s
+        ON p.startup_id = s.id
+    WHERE p.id = $1
+    `,
+    [proposal_id]
+);
 
 
         if (proposalResult.rows.length === 0) {
@@ -306,7 +309,7 @@ const createPilotValidation = async (req, res) => {
             [
                 proposal_id,
                 kpi_id,
-                actual_value || null,
+                actual_value ?? null,
                 status || "PENDING",
                 remarks || null,
                 req.user.id
@@ -337,7 +340,7 @@ const createPilotValidation = async (req, res) => {
             )
             `,
             [
-                proposal.startup_id,
+                proposal.startup_user_id,
                 "Pilot Validation Updated",
                 `Pilot validation for KPI #${kpi_id} has been recorded for your proposal #${proposal_id}. Status: ${status || "PENDING"}.`,
                 "PILOT"
