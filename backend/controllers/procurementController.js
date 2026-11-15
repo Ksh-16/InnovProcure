@@ -65,33 +65,49 @@ const createProcurement = async (req, res) => {
             start_date
         } = req.body;
 
-        if (!proposal_id) {
+        if (!proposal_id || !Number.isInteger(Number(proposal_id)) ||
+            Number(proposal_id) <= 0) {
             return res.status(400).json({
                 success: false,
-                message: "Proposal ID is required"
+                message: "A valid Proposal ID is required"
             });
         }
 
-        const procurement_officer_id = req.user.id;
+        if (
+            contract_value !== undefined &&
+            contract_value !== null &&
+            (
+                contract_value === "" ||
+                !Number.isFinite(Number(contract_value)) ||
+                Number(contract_value) < 0
+            )
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "Contract value must be a valid non-negative number"
+            });
+        }
+
+        const procurementOfficerId = req.user.id;
+
+        // Check whether procurement already exists
         const existingProcurement = await pool.query(
-    `SELECT id
-     FROM procurements
-     WHERE proposal_id = $1`,
-    [proposal_id]
-);
+            `SELECT id FROM procurements WHERE proposal_id = $1`,
+            [proposal_id]
+        );
 
-if (existingProcurement.rows.length > 0) {
-    return res.status(400).json({
-        success: false,
-        message: "Procurement already exists for this proposal"
-    });
-}
-        
+        if (existingProcurement.rows.length > 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Procurement already exists for this proposal"
+            });
+        }
 
-        // Check proposal and find startup's USER id
+        // Find proposal and startup user
         const proposalResult = await pool.query(
-            `SELECT 
+            `SELECT
                 p.id,
+                p.challenge_id,
                 s.user_id AS startup_user_id
              FROM proposals p
              JOIN startups s ON p.startup_id = s.id
@@ -106,7 +122,62 @@ if (existingProcurement.rows.length > 0) {
             });
         }
 
-        const startupUserId = proposalResult.rows[0].startup_user_id;
+        const proposal = proposalResult.rows[0];
+
+        // Check that the proposal has been evaluated
+        const evaluationResult = await pool.query(
+            `SELECT id
+             FROM evaluations
+             WHERE proposal_id = $1
+             LIMIT 1`,
+            [proposal_id]
+        );
+
+        if (evaluationResult.rows.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Proposal must be evaluated before procurement"
+            });
+        }
+
+        // Check that every challenge KPI has passed pilot validation
+        const validationResult = await pool.query(
+            `SELECT
+                (SELECT COUNT(*)
+                 FROM challenge_kpis
+                 WHERE challenge_id = $2) AS total_kpis,
+
+                (SELECT COUNT(DISTINCT kpi_id)
+                 FROM pilot_validations
+                 WHERE proposal_id = $1) AS validated_kpis,
+
+                (SELECT COUNT(DISTINCT kpi_id)
+                 FROM pilot_validations
+                 WHERE proposal_id = $1
+                 AND status = 'PASSED') AS passed_kpis`,
+            [proposal_id, proposal.challenge_id]
+        );
+
+        const {
+            total_kpis,
+            validated_kpis,
+            passed_kpis
+        } = validationResult.rows[0];
+
+        const total = Number(total_kpis);
+        const validated = Number(validated_kpis);
+        const passed = Number(passed_kpis);
+
+        if (
+            total === 0 ||
+            validated !== total ||
+            passed !== total
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "All challenge KPIs must pass pilot validation before procurement"
+            });
+        }
 
         // Create procurement
         const result = await pool.query(
@@ -122,95 +193,59 @@ if (existingProcurement.rows.length > 0) {
             RETURNING *`,
             [
                 proposal_id,
-                procurement_officer_id,
+                procurementOfficerId,
                 contract_number || null,
-                contract_value || null,
+                contract_value ?? null,
                 start_date || null
             ]
         );
 
         const procurement = result.rows[0];
 
-        console.log("PROCUREMENT CREATED:", procurement);
-        console.log("STARTUP USER ID:", startupUserId);
-
         // Notify startup
-        console.log("INSERTING STARTUP NOTIFICATION...");
-
         await pool.query(
             `INSERT INTO notifications
-            (
-                user_id,
-                title,
-                message,
-                type
-            )
+            (user_id, title, message, type)
             VALUES ($1, $2, $3, $4)`,
             [
-                startupUserId,
+                proposal.startup_user_id,
                 "Procurement Initiated",
                 `Procurement has been initiated for your proposal #${proposal_id}. Contract ${procurement.contract_number || "details pending"}.`,
                 "PROCUREMENT"
             ]
         );
 
-        console.log("STARTUP NOTIFICATION INSERTED");
-
-        // Find all government users
-        const governments = await pool.query(
-            `SELECT id
-             FROM users
-             WHERE role = 'GOVERNMENT'`
+        // Notify government users
+        await pool.query(
+            `INSERT INTO notifications
+            (user_id, title, message, type)
+            SELECT id, $1, $2, $3
+            FROM users
+            WHERE role = 'GOVERNMENT'`,
+            [
+                "Procurement Created",
+                `Procurement has been created for proposal #${proposal_id}. Contract value: ${procurement.contract_value ?? "Not specified"}.`,
+                "PROCUREMENT"
+            ]
         );
 
-        console.log("GOVERNMENT USERS:", governments.rows);
-
-        // Notify government users
-        for (const government of governments.rows) {
-
-            console.log(
-                "INSERTING GOVERNMENT NOTIFICATION FOR:",
-                government.id
-            );
-
-            await pool.query(
-                `INSERT INTO notifications
-                (
-                    user_id,
-                    title,
-                    message,
-                    type
-                )
-                VALUES ($1, $2, $3, $4)`,
-                [
-                    government.id,
-                    "Procurement Created",
-                    `Procurement has been created for proposal #${proposal_id}. Contract value: ${procurement.contract_value || "Not specified"}.`,
-                    "PROCUREMENT"
-                ]
-            );
-
-            console.log(
-                "GOVERNMENT NOTIFICATION INSERTED FOR:",
-                government.id
-            );
-        }
-
-        res.status(201).json({
+        return res.status(201).json({
             success: true,
             message: "Procurement created successfully",
-            procurement: procurement
+            procurement
         });
 
     } catch (error) {
         console.error("Error creating procurement:", error);
 
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: "Failed to create procurement"
         });
     }
 };
+
+
 
 // Update procurement
 const updateProcurement = async (req, res) => {
