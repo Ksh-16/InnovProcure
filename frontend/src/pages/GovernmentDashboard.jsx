@@ -1966,16 +1966,13 @@ function GovernmentDashboard() {
                                                     );
 
 
-                                                const status =
-    getProposalStatus(
-        proposal.id,
-        selectedProgressData
-            .evaluations,
-        selectedProgressData
-            .pilotValidations,
-        selectedProgressData
-            .procurements
-    );
+                                               const status = getProposalStatus(
+    proposal.id,
+    selectedProgressData.evaluations,
+    selectedProgressData.pilotValidations,
+    selectedProgressData.procurements,
+    progressKpis.length
+);
 
 
                                                 const statusClass =
