@@ -1,5 +1,5 @@
-const pool = require("../config/db");
 
+const pool = require("../config/db");
 
 // ==========================================
 // GET ALL DEPARTMENTS
@@ -7,31 +7,28 @@ const pool = require("../config/db");
 
 const getDepartments = async (req, res) => {
     try {
-
         const result = await pool.query(`
-            SELECT 
+            SELECT
                 gd.id,
                 gd.user_id,
                 gd.department_name,
                 u.name AS user_name,
                 u.email AS user_email
             FROM government_departments gd
-            LEFT JOIN users u
-                ON gd.user_id = u.id
+            LEFT JOIN users u ON gd.user_id = u.id
             ORDER BY gd.id DESC
         `);
 
-        res.json({
+        return res.json({
             success: true,
             count: result.rows.length,
             departments: result.rows
         });
 
     } catch (error) {
+        console.error("Get departments error:", error);
 
-        console.error(error);
-
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: "Failed to fetch departments"
         });
@@ -45,40 +42,43 @@ const getDepartments = async (req, res) => {
 
 const getDepartmentById = async (req, res) => {
     try {
+        const id = Number(req.params.id);
 
-        const { id } = req.params;
+        if (!Number.isInteger(id) || id <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid department ID"
+            });
+        }
 
         const result = await pool.query(`
-            SELECT 
+            SELECT
                 gd.id,
                 gd.user_id,
                 gd.department_name,
                 u.name AS user_name,
                 u.email AS user_email
             FROM government_departments gd
-            LEFT JOIN users u
-                ON gd.user_id = u.id
+            LEFT JOIN users u ON gd.user_id = u.id
             WHERE gd.id = $1
         `, [id]);
 
         if (result.rows.length === 0) {
-
             return res.status(404).json({
                 success: false,
                 message: "Department not found"
             });
         }
 
-        res.json({
+        return res.json({
             success: true,
             department: result.rows[0]
         });
 
     } catch (error) {
+        console.error("Get department error:", error);
 
-        console.error(error);
-
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: "Failed to fetch department"
         });
@@ -92,41 +92,51 @@ const getDepartmentById = async (req, res) => {
 
 const createDepartment = async (req, res) => {
     try {
-
         const { department_name } = req.body;
 
-        if (!department_name || department_name.trim() === "") {
-
+        if (
+            typeof department_name !== "string" ||
+            department_name.trim() === ""
+        ) {
             return res.status(400).json({
                 success: false,
-                message: "Department name is required"
+                message: "A valid department name is required"
             });
         }
+
+        const name = department_name.trim();
 
         const result = await pool.query(
             `
             INSERT INTO government_departments
-            (user_id, department_name)
+                (user_id, department_name)
             VALUES ($1, $2)
             RETURNING *
             `,
-            [
-                req.user.id,
-                department_name.trim()
-            ]
+            [req.user.id, name]
         );
 
-        res.status(201).json({
+        return res.status(201).json({
             success: true,
             message: "Department created successfully",
             department: result.rows[0]
         });
 
     } catch (error) {
+        console.error("Create department error:", error);
 
-        console.error(error);
+        // Unique constraint: one department per government user
+        if (
+            error.code === "23505" &&
+            error.constraint === "government_departments_user_id_key"
+        ) {
+            return res.status(409).json({
+                success: false,
+                message: "A department is already registered for this government account"
+            });
+        }
 
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: "Failed to create department"
         });
@@ -140,15 +150,23 @@ const createDepartment = async (req, res) => {
 
 const updateDepartment = async (req, res) => {
     try {
-
-        const { id } = req.params;
+        const id = Number(req.params.id);
         const { department_name } = req.body;
 
-        if (!department_name || department_name.trim() === "") {
-
+        if (!Number.isInteger(id) || id <= 0) {
             return res.status(400).json({
                 success: false,
-                message: "Department name is required"
+                message: "Invalid department ID"
+            });
+        }
+
+        if (
+            typeof department_name !== "string" ||
+            department_name.trim() === ""
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "A valid department name is required"
             });
         }
 
@@ -157,33 +175,33 @@ const updateDepartment = async (req, res) => {
             UPDATE government_departments
             SET department_name = $1
             WHERE id = $2
+              AND user_id = $3
             RETURNING *
             `,
             [
                 department_name.trim(),
-                id
+                id,
+                req.user.id
             ]
         );
 
         if (result.rows.length === 0) {
-
             return res.status(404).json({
                 success: false,
-                message: "Department not found"
+                message: "Department not found or you do not have permission to update it"
             });
         }
 
-        res.json({
+        return res.json({
             success: true,
             message: "Department updated successfully",
             department: result.rows[0]
         });
 
     } catch (error) {
+        console.error("Update department error:", error);
 
-        console.error(error);
-
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: "Failed to update department"
         });
@@ -197,36 +215,41 @@ const updateDepartment = async (req, res) => {
 
 const deleteDepartment = async (req, res) => {
     try {
+        const id = Number(req.params.id);
 
-        const { id } = req.params;
+        if (!Number.isInteger(id) || id <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid department ID"
+            });
+        }
 
         const result = await pool.query(
             `
             DELETE FROM government_departments
             WHERE id = $1
+              AND user_id = $2
             RETURNING *
             `,
-            [id]
+            [id, req.user.id]
         );
 
         if (result.rows.length === 0) {
-
             return res.status(404).json({
                 success: false,
-                message: "Department not found"
+                message: "Department not found or you do not have permission to delete it"
             });
         }
 
-        res.json({
+        return res.json({
             success: true,
             message: "Department deleted successfully"
         });
 
     } catch (error) {
+        console.error("Delete department error:", error);
 
-        console.error(error);
-
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: "Failed to delete department"
         });
