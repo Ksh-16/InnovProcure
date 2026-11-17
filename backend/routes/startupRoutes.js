@@ -1,4 +1,7 @@
+
 const express = require("express");
+
+const authenticate = require("../middleware/authMiddleware");
 
 const {
     getStartups,
@@ -7,13 +10,18 @@ const {
 
 const router = express.Router();
 
-
 // Get all startups
-router.get("/", getStartups);
-
+router.get(
+    "/",
+    authenticate,
+    getStartups
+);
 
 // Get startup by ID
-router.get("/:id", getStartupById);
-
+router.get(
+    "/:id",
+    authenticate,
+    getStartupById
+);
 
 module.exports = router;
