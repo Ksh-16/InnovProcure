@@ -1,6 +1,10 @@
+
 const express = require("express");
 const cors = require("cors");
 const pool = require("./config/db");
+
+const authenticate = require("./middleware/authMiddleware");
+
 const authRoutes = require("./routes/authRoutes");
 const procurementRoutes = require("./routes/procurementRoutes");
 const startupRoutes = require("./routes/startupRoutes");
@@ -11,10 +15,21 @@ const departmentRoutes = require("./routes/departmentRoutes");
 const proposalRoutes = require("./routes/proposalRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const pilotRoutes = require("./routes/pilotRoutes");
+
 const app = express();
 
-app.use(cors());
-app.use(express.json());
+// Middleware
+const allowedOrigins = process.env.FRONTEND_URL
+    ? process.env.FRONTEND_URL.split(",").map(origin => origin.trim())
+    : ["http://localhost:5173"];
+
+app.use(cors({
+    origin: allowedOrigins
+}));
+
+app.use(express.json({ limit: "1mb" }));
+
+// API Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/challenges", challengeRoutes);
 app.use("/api/procurements", procurementRoutes);
@@ -26,13 +41,16 @@ app.use("/api/proposals", proposalRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/pilot-validations", pilotRoutes);
 
+// Root route
 app.get("/", (req, res) => {
     res.json({
+        success: true,
         message: "InnovProcure API is running"
     });
 });
 
-app.get("/api/test-db", async (req, res) => {
+// Protected database health check
+app.get("/api/test-db", authenticate, async (req, res, next) => {
     try {
         const result = await pool.query("SELECT NOW()");
 
@@ -43,13 +61,26 @@ app.get("/api/test-db", async (req, res) => {
         });
 
     } catch (error) {
-        console.error(error);
-
-        res.status(500).json({
-            success: false,
-            message: "Database connection failed"
-        });
+        next(error);
     }
+});
+
+// Handle unknown routes
+app.use((req, res) => {
+    res.status(404).json({
+        success: false,
+        message: "API endpoint not found"
+    });
+});
+
+// Central error handler
+app.use((error, req, res, next) => {
+    console.error("Server error:", error.message);
+
+    res.status(500).json({
+        success: false,
+        message: "Internal server error"
+    });
 });
 
 module.exports = app;
