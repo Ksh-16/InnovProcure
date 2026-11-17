@@ -24,7 +24,7 @@ router.get("/me", authenticate, (req, res) => {
 router.get(
     "/admin-test",
     authenticate,
-    authorize("admin"),
+   authorize("ADMIN"),
     (req, res) => {
         res.json({
             success: true,
