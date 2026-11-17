@@ -81,10 +81,12 @@ const login = async (req, res) => {
             });
         }
 
-        const result = await pool.query(
-            "SELECT * FROM users WHERE email = $1",
-            [email]
-        );
+       const normalizedEmail = email.trim().toLowerCase();
+
+const result = await pool.query(
+    "SELECT * FROM users WHERE email = $1",
+    [normalizedEmail]
+);
 
         if (result.rows.length === 0) {
             return res.status(401).json({
@@ -106,7 +108,14 @@ const login = async (req, res) => {
                 message: "Invalid email or password"
             });
         }
+if (!process.env.JWT_SECRET) {
+    console.error("JWT_SECRET is not configured");
 
+    return res.status(500).json({
+        success: false,
+        message: "Authentication service is not configured"
+    });
+}
         const token = jwt.sign(
             {
                 id: user.id,
